@@ -136,7 +136,58 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
-
+    
+    for (int i = 0; i < num_particles; i++) {
+        Particle p = particles[i];
+        vector<LandmarkObs> predicted;
+        
+        // select landmarks within sensor range
+        for (int j = 0; j < map_landmarks.landmark_list.size(); j++) {
+            double landmark_x = map_landmarks.landmark_list[j].x_f;
+            double landmark_y = map_landmarks.landmark_list[j].y_f;
+            int landmark_id = map_landmarks.landmark_list[j].id_i;
+            
+            double distance_landmark_particle = dist(p.x, p.y, landmark_x, landmark_y);
+            
+            if (distance_landmark_particle <= sensor_range) {
+                predicted.push_back(LandmarkObs{landmark_id, landmark_x, landmark_y});
+            }
+        }
+        
+        // transform observations to world coordinates
+        vector<LandmarkObs> transformed_obs;
+        for (int j = 0; j < observations.size(); j++) {
+            // calculate x,y
+            double trans_x = observations[j].x * cos(p.theta) - observations[j].y * sin(p.theta) + p.x;
+            double trans_y = observations[j].x * sin(p.theta) + observations[j].y * cos(p.theta) + p.y;
+            transformed_obs.push_back(LandmarkObs{observations[j].id, trans_x, trans_y});
+        }
+        
+        // associate closest predicted landmark to observation
+        dataAssociation(predicted, transformed_obs);
+        
+        //reset weight
+        particles[i].weight = 1.0;
+        
+        for (int j = 0; j < transformed_obs.size(); j++) {
+            double obs_x, obs_y, pred_x, pred_y;
+            obs_x = transformed_obs[j].x;
+            obs_y = transformed_obs[j].y;
+            
+            int associated_pred_id = transformed_obs[j].id;
+            
+            for (int k = 0; k < predicted.size(); k++) {
+                if (predicted[k].id == associated_pred_id) {
+                    pred_x = predicted[k].x;
+                    pred_y = predicted[k].y;
+                    break;
+                }
+            }
+            
+            particles[i].weight *= calculateMultivariateGaussian(pred_x, pred_y, obs_x, obs_y, std_landmark[0], std_landmark[1]);
+        }
+        weights[i] = particles[i].weight;
+    }
 }
 
 void ParticleFilter::resample() {
