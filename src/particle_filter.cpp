@@ -21,6 +21,10 @@
 using std::string;
 using std::vector;
 
+using namespace std;
+
+static default_random_engine generator;
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
     /*
      TODO: Set the number of particles. Initialize all particles to first position (based on estimates of x, y, theta and their uncertainties from GPS) and all weights to 1.
@@ -30,7 +34,6 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     num_particles = 1000;  // TODO: Set the number of particles
     
     // initialization variables
-    std::default_random_engine gen;
     double std_x = std[0];
     double std_y = std[1];
     double std_theta = std[2];
@@ -44,10 +47,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     for (int i = 0; i < num_particles; i++) {
         Particle particle = Particle();
         particle.id = i;
-        particle.x = dist_x(gen);
-        particle.y = dist_y(gen);
-        particle.theta = dist_theta(gen);
         particle.weight = 1;
+        particle.x = dist_x(generator);
+        particle.y = dist_y(generator);
+        particle.theta = dist_theta(generator);
 
         particles.push_back(particle);
     }
@@ -67,7 +70,6 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    */
     
     // initialization variables
-    std::default_random_engine gen;
     double std_x = std_pos[0];
     double std_y = std_pos[1];
     double std_theta = std_pos[2];
@@ -85,9 +87,14 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
         std::normal_distribution<double> dist_y(y_predicted, std_y);
         std::normal_distribution<double> dist_theta(theta_predicted, std_theta);
         
-        particles[i].x = dist_x(gen);
-        particles[i].y = dist_y(gen);
-        particles[i].theta = dist_theta(gen);
+        normal_distribution<double> dist_x(new_x, std_x);
+        normal_distribution<double> dist_y(new_y, std_y);
+        normal_distribution<double> dist_theta(new_theta, std_theta);
+        
+        // add noise
+        particles[i].x = dist_x(generator);
+        particles[i].y = dist_y(generator);
+        particles[i].theta = dist_theta(generator);
     }
 }
 
