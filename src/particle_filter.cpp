@@ -197,7 +197,26 @@ void ParticleFilter::resample() {
    * NOTE: You may find std::discrete_distribution helpful here.
    *   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
    */
-
+    double max_weight = *max_element(weights.begin(), weights.end());
+    
+    uniform_int_distribution<> uniform_int(0,num_particles-1);
+    uniform_real_distribution<double> uniform(0.0, 2*max_weight);
+    
+    vector<Particle> resambled_particles;
+    
+    double beta = 0;
+    
+    auto index = uniform_int(generator);
+    
+    for (int i = 0; i < num_particles; i++) {
+        beta += uniform(generator);
+        while (weights[index] < beta) {
+            beta -= weights[index];
+            index = (index+1) % num_particles;
+        }
+        resambled_particles.push_back(particles[index]);
+    }
+    particles = resambled_particles;
 }
 
 void ParticleFilter::SetAssociations(Particle& particle, 
