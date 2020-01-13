@@ -40,14 +40,15 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
       
     // initialization of particles
     for (int i = 0; i < num_particles; i++) {
-        Particle particle = Particle();
+        Particle particle;
         particle.id = i;
-        particle.weight = 1;
         particle.x = dist_x(generator);
         particle.y = dist_y(generator);
         particle.theta = dist_theta(generator);
+        particle.weight = 1.0;
 
         particles.push_back(particle);
+        weights.push_back(1.0);
     }
     
     // set particle filtes initialized
@@ -73,14 +74,17 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
     for (int i = 0; i < num_particles; i++) {
         // calculate predicted location
         double theta = particles[i].theta;
-        double x_predicted = particles[i].x + velocity/yaw_rate * (sin(theta + yaw_rate*delta_t) - sin(theta));
-        double y_predicted = particles[i].y + velocity/yaw_rate * (cos(theta) - cos(theta + yaw_rate*delta_t));
-        double theta_predicted = theta + yaw_rate*delta_t;
+        while (theta < 0 || theta > 2*M_PI) {
+            if (theta < 0) {
+                theta += 2*M_PI;
+            } else {
+                theta -= 2*M_PI;
+            }
+        }
         
-        // add noise
-        std::normal_distribution<double> dist_x(x_predicted, std_x);
-        std::normal_distribution<double> dist_y(y_predicted, std_y);
-        std::normal_distribution<double> dist_theta(theta_predicted, std_theta);
+        double new_x = particles[i].x + (velocity/yaw_rate) * (sin(theta + (yaw_rate*delta_t)) - sin(theta));
+        double new_y = particles[i].y + (velocity/yaw_rate) * (cos(theta) - cos(theta + (yaw_rate*delta_t)));
+        double new_theta = theta + yaw_rate*delta_t;
         
         normal_distribution<double> dist_x(new_x, std_x);
         normal_distribution<double> dist_y(new_y, std_y);
@@ -104,12 +108,12 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   during the updateWeights phase.
    */
     for (int i = 0; i < observations.size(); i++) {
-        LandmarkObs obs = observation[i];
-        int map_id = 0;
-        double min_distance = -1;
+        LandmarkObs obs = observations[i];
+        int map_id = -1;
+        double min_distance = 1000000000000000000;
         
         for (int j = 0; j < predicted.size(); j++) {
-            LandmarkObs pred = predicted[i];
+            LandmarkObs pred = predicted[j];
             double distance = dist(obs.x,obs.y,pred.x,pred.y);
             
             if (min_distance < 0 or min_distance > distance) {
