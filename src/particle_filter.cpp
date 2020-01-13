@@ -33,15 +33,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     */
     num_particles = 1000;  // TODO: Set the number of particles
     
-    // initialization variables
-    double std_x = std[0];
-    double std_y = std[1];
-    double std_theta = std[2];
-    
     // initialization of normal distributions
-    std::normal_distribution<double> dist_x(x, std_x);
-    std::normal_distribution<double> dist_y(y, std_y);
-    std::normal_distribution<double> dist_theta(theta, std_theta);
+    normal_distribution<double> dist_x(x, std[0]);
+    normal_distribution<double> dist_y(y, std[1]);
+    normal_distribution<double> dist_theta(theta, std[2]);
       
     // initialization of particles
     for (int i = 0; i < num_particles; i++) {
