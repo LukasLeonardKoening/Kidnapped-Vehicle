@@ -66,25 +66,25 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    */
     
     // initialization variables
-    double std_x = std_pos[0];
-    double std_y = std_pos[1];
-    double std_theta = std_pos[2];
+    double p_x, p_y, theta, std_x, std_y, std_theta, new_x, new_y, new_theta;
+    std_x = std_pos[0];
+    std_y = std_pos[1];
+    std_theta = std_pos[2];
     
     // Predict each particle
     for (int i = 0; i < num_particles; i++) {
-        // calculate predicted location
-        double theta = particles[i].theta;
-        while (theta < 0 || theta > 2*M_PI) {
-            if (theta < 0) {
-                theta += 2*M_PI;
-            } else {
-                theta -= 2*M_PI;
-            }
-        }
+        p_x = particles[i].x;
+        p_y = particles[i].y;
+        theta = particles[i].theta;
         
-        double new_x = particles[i].x + (velocity/yaw_rate) * (sin(theta + (yaw_rate*delta_t)) - sin(theta));
-        double new_y = particles[i].y + (velocity/yaw_rate) * (cos(theta) - cos(theta + (yaw_rate*delta_t)));
-        double new_theta = theta + yaw_rate*delta_t;
+        if (fabs(yaw_rate) < 0.00001) {
+            new_x = p_x + (velocity * delta_t * cos(theta));
+            new_y = p_y + (velocity * delta_t * sin(theta));
+        } else {
+            new_x = p_x + (velocity/yaw_rate) * (sin(theta + (yaw_rate*delta_t)) - sin(theta));
+            new_y = p_y + (velocity/yaw_rate) * (cos(theta) - cos(theta + (yaw_rate*delta_t)));
+            new_theta = theta + yaw_rate*delta_t;
+        }
         
         normal_distribution<double> dist_x(new_x, std_x);
         normal_distribution<double> dist_y(new_y, std_y);
