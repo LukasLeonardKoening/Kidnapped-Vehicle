@@ -15,6 +15,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <limits>
 
 #include "helper_functions.h"
 
@@ -92,7 +93,7 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, vector<Landm
         // init some variables
         LandmarkObs obs = observations[i];
         int map_id = -1;
-        double min_distance = 1000000000000000000;
+        double min_distance = numeric_limits<double>::max();
         
         // find nearest landmark (nearest neighbor)
         for (int j = 0; j < predicted.size(); j++) {
