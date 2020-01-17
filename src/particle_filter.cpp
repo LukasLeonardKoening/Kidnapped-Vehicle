@@ -75,12 +75,12 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
             new_theta = theta + yaw_rate*delta_t;
         }
         
-        // calculate predicted location
+        // calculate predicted location with noise
         normal_distribution<double> dist_x(new_x, std_x);
         normal_distribution<double> dist_y(new_y, std_y);
         normal_distribution<double> dist_theta(new_theta, std_theta);
         
-        // add noise
+        // update particles
         particles[i].x = dist_x(generator);
         particles[i].y = dist_y(generator);
         particles[i].theta = dist_theta(generator);
@@ -172,14 +172,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], c
 }
 
 void ParticleFilter::resample() {
-    // get maximal weight
-    double max_weight = *max_element(weights.begin(), weights.end());
-    
-    // init distributions
-    uniform_real_distribution<double> uniform(0.0, 2*max_weight);
+    // init distribution
     discrete_distribution<> resample_index_dist(weights.begin(), weights.end());
     
-    // init variables
+    // init variable
     vector<Particle> resambled_particles;
     
     // for each particle...
