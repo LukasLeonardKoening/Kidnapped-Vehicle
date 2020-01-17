@@ -1,143 +1,158 @@
-# Overview
-This repository contains all the code needed to complete the final project for the Localization course in Udacity's Self-Driving Car Nanodegree.
+# Project 6 - Kidnapped Vehicle
 
-#### Submission
-All you will need to submit is your `src` directory. You should probably do a `git pull` before submitting to verify that your project passes the most up-to-date version of the grading code (there are some parameters in `src/main.cpp` which govern the requirements on accuracy and run time).
+This project from Udacity‘s Self-Driving Car Engineer Nanodegree program implements a localization technique in C++ to find a kidnapped self-driving car. The project covers the implementation of a 2D particle filter, localization with a given map and (noisy) GPS estimate of location and testing in a simulator.
 
-## Project Introduction
-Your robot has been kidnapped and transported to a new location! Luckily it has a map of this location, a (noisy) GPS estimate of its initial location, and lots of (noisy) sensor and control data.
+----
 
-In this project you will implement a 2 dimensional particle filter in C++. Your particle filter will be given a map and some initial localization information (analogous to what a GPS would provide). At each time step your filter will also get observation and control data.
+## 1 - Project Overview
 
-## Running the Code
-This project involves the Term 2 Simulator which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases)
+### Goals:
 
-This repository includes two files that can be used to set up and install uWebSocketIO for either Linux or Mac systems. For windows you can use either Docker, VMware, or even Windows 10 Bash on Ubuntu to install uWebSocketIO.
+* Build a particle filter that can localize a vehicle by lidar and GPS input and given landmarks on a map
+* Reach a given performance 
+* Test the particle filter in a simulator brovided by Udacity
 
-Once the install for uWebSocketIO is complete, the main program can be built and ran by doing the following from the project top directory.
+### Structure:
 
-1. mkdir build
-2. cd build
-3. cmake ..
-4. make
-5. ./particle_filter
+The project is divided into different files. The simlator can be found [here](https://github.com/udacity/self-driving-car-sim/releases/).
 
-Alternatively some scripts have been included to streamline this process, these can be leveraged by executing the following in the top directory of the project:
+* `src/particle_filter.cpp`: the particle filter (with header file)
+* `src/main.cpp`: the routine with connection to the simulator
+* other helper, build and installation files
 
-1. ./clean.sh
-2. ./build.sh
-3. ./run.sh
+---
 
-Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
+## 2 - Rubic Points
 
-Note that the programs that need to be written to accomplish the project are src/particle_filter.cpp, and particle_filter.h
+Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/747/view) individually and describe how I addressed each point in my implementation.
 
-The program main.cpp has already been filled out, but feel free to modify it.
+#### 2.1 - Compiling
 
-Here is the main protocol that main.cpp uses for uWebSocketIO in communicating with the simulator.
+**1.) Does your particle filter localize the vehicle to within the desired accuracy?**
 
-INPUT: values provided by the simulator to the c++ program
+This is checked automatically when you run the run.sh file. Here are some images during runtime and at success:
 
-// sense noisy position data from the simulator
+![](data/images/runtime.png)
 
-["sense_x"]
+![](data/images/success.png)
 
-["sense_y"]
+More Details about the implementation can be found below.
 
-["sense_theta"]
+#### 2.2 - Performance
 
-// get the previous velocity and yaw rate to predict the particle's transitioned state
+**1.) Does your particle run within the specified time of 100 seconds?**
 
-["previous_velocity"]
+This criteria is also check automatically. In the image above you can see, that the implementation managed to complete the course in almost half of the required time.
 
-["previous_yawrate"]
+#### 2.3 - General
 
-// receive noisy observation data from the simulator, in a respective list of x/y values
+**1.) Does your code use a particle filter to localize the robot?**
 
-["sense_observations_x"]
+I implemented the particle filter in the `particle_filter.cpp` file. The algorithm is shown in the following flowchart (from Udacity):
 
-["sense_observations_y"]
+![](data/images/flowchart.png)
 
+How I implemented the four steps initialization, prediction, update and resample is now explained:
 
-OUTPUT: values provided by the c++ program to the simulator
+The function `ParticleFilter::init(double x, double y, double theta, double std[])` takes in an initial estimated GPS position x,y and theta (orientation) and the standard deviation of them. I use these values to create 100 particles and **initialize** them with a normal distributed position (lines 30-52):
 
-// best particle values used for calculating the error evaluation
+ ```c++ 
+// number of particles
+num_particles = 100;
+    
+// initialization of normal distributions
+normal_distribution<double> dist_x(x, std[0]);
+normal_distribution<double> dist_y(y, std[1]);
+normal_distribution<double> dist_theta(theta, std[2]);
 
-["best_particle_x"]
+// initialization of particles
+for (int i = 0; i < num_particles; i++) {
+  Particle particle;
+  particle.id = i;
+  particle.x = dist_x(generator);
+  particle.y = dist_y(generator);
+  particle.theta = dist_theta(generator);
+  particle.weight = 1.0;
 
-["best_particle_y"]
+  particles.push_back(particle);
+  weights.push_back(1.0);
+}
 
-["best_particle_theta"]
+// set particle filtes initialized
+is_initialized = true;
+ ```
 
-//Optional message data used for debugging particle's sensing and associations
+The next step is to **predict** the positions of the particles after an elapsed time and moving the vehicle. This is implemented in lines 56-87. First I calculate the new positions according to the elapsed time, the vehicles velocity and yaw rate and the add the sensor noise to the calculation.
 
-// for respective (x,y) sensed positions ID label
+```c++ 
+ // initialization variables
+double p_x, p_y, theta, std_x, std_y, std_theta, new_x, new_y, new_theta;
+std_x = std_pos[0];
+std_y = std_pos[1];
+std_theta = std_pos[2];
 
-["best_particle_associations"]
+// Predict each particle
+for (int i = 0; i < num_particles; i++) {
+  	p_x = particles[i].x;
+    p_y = particles[i].y;
+    theta = particles[i].theta;
 
-// for respective (x,y) sensed positions
+    // if yaw rate is almost 0, ignore it
+    if (fabs(yaw_rate) < 0.00001) {
+        new_x = p_x + (velocity * delta_t * cos(theta));
+        new_y = p_y + (velocity * delta_t * sin(theta));
+    } else {
+        new_x = p_x + (velocity/yaw_rate) * (sin(theta + (yaw_rate*delta_t)) - sin(theta));
+        new_y = p_y + (velocity/yaw_rate) * (cos(theta) - cos(theta + (yaw_rate*delta_t)));
+        new_theta = theta + yaw_rate*delta_t;
+    }
 
-["best_particle_sense_x"] <= list of sensed x positions
+  // calculate predicted location with noise
+  normal_distribution<double> dist_x(new_x, std_x);
+  normal_distribution<double> dist_y(new_y, std_y);
+  normal_distribution<double> dist_theta(new_theta, std_theta);
 
-["best_particle_sense_y"] <= list of sensed y positions
-
-
-Your job is to build out the methods in `particle_filter.cpp` until the simulator output says:
-
+  // add noise
+  particles[i].x = dist_x(generator);
+  particles[i].y = dist_y(generator);
+  particles[i].theta = dist_theta(generator);
+}
 ```
-Success! Your particle filter passed!
+
+Step three is the **update step**. Here I update the weights of each particle according to how likely the are. This is done by "next neighbour" where the nearest predicted particle to the sensed landmark is chosen as best estimation. "Next neighbour" is not the best way because sometimes the nearest particle is not always the best choice but it works in the most situations. The whole code can be found in lines 90 to 172. Here I just want to point out some lines:
+
+```c++ 
+// transform observations to world coordinates
+vector<LandmarkObs> transformed_obs;
+for (int j = 0; j < observations.size(); j++) {
+  // calculate x,y
+  double trans_x = observations[j].x * cos(p.theta) - observations[j].y * sin(p.theta) + p.x;
+  double trans_y = observations[j].x * sin(p.theta) + observations[j].y * cos(p.theta) + p.y;
+  transformed_obs.push_back(LandmarkObs{observations[j].id, trans_x, trans_y});
+}
 ```
 
-# Implementing the Particle Filter
-The directory structure of this repository is as follows:
+Since the observed landmarks are in vehicle coordinates, the observations have to be transformed to the world coordinates, which happens in lines 137-144.
 
+The "next neighbour" data association technique is implemented in lines 90-111.
+
+The weight of each particle is calculated as product of the multivariate gaussian of the prediction and all observations of landmarks (line 167 and the function `double calculateMultivariateGaussian(double x, double y, double mu_x, double mu_y, double sigma_x, double sigma_y)` in lines 113-116).
+
+The last step is to **resample** the particles according to their weight. This is implemented in the `ParticleFilter::resample()` function in lines 174 to 189. I use the build-in discrete_distribution to pick the particles randomly but weighted by their weight from the particle array. By this I prefer particles with a higher weight.
+
+```c++ 
+// init distribution
+discrete_distribution<> resample_index_dist(weights.begin(), weights.end());
+
+// init variable
+vector<Particle> resambled_particles;
+
+// for each particle...
+for (int i = 0; i < num_particles; i++) {
+  // choose particles randomly but weighted from particle array (particle with higher weight is more likely than a particle with lower weight)
+  int index = resample_index_dist(generator);
+  resambled_particles.push_back(particles[index]);
+}
+// update particles array
+particles = resambled_particles;
 ```
-root
-|   build.sh
-|   clean.sh
-|   CMakeLists.txt
-|   README.md
-|   run.sh
-|
-|___data
-|   |   
-|   |   map_data.txt
-|   
-|   
-|___src
-    |   helper_functions.h
-    |   main.cpp
-    |   map.h
-    |   particle_filter.cpp
-    |   particle_filter.h
-```
-
-The only file you should modify is `particle_filter.cpp` in the `src` directory. The file contains the scaffolding of a `ParticleFilter` class and some associated methods. Read through the code, the comments, and the header file `particle_filter.h` to get a sense for what this code is expected to do.
-
-If you are interested, take a look at `src/main.cpp` as well. This file contains the code that will actually be running your particle filter and calling the associated methods.
-
-## Inputs to the Particle Filter
-You can find the inputs to the particle filter in the `data` directory.
-
-#### The Map*
-`map_data.txt` includes the position of landmarks (in meters) on an arbitrary Cartesian coordinate system. Each row has three columns
-1. x position
-2. y position
-3. landmark id
-
-### All other data the simulator provides, such as observations and controls.
-
-> * Map data provided by 3D Mapping Solutions GmbH.
-
-## Success Criteria
-If your particle filter passes the current grading code in the simulator (you can make sure you have the current version at any time by doing a `git pull`), then you should pass!
-
-The things the grading code is looking for are:
-
-
-1. **Accuracy**: your particle filter should localize vehicle position and yaw to within the values specified in the parameters `max_translation_error` and `max_yaw_error` in `src/main.cpp`.
-
-2. **Performance**: your particle filter should complete execution within the time of 100 seconds.
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
