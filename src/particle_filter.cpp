@@ -175,25 +175,17 @@ void ParticleFilter::resample() {
     // get maximal weight
     double max_weight = *max_element(weights.begin(), weights.end());
     
-    // init uniform distributions
-    uniform_int_distribution<> uniform_int(0,num_particles-1);
+    // init distributions
     uniform_real_distribution<double> uniform(0.0, 2*max_weight);
+    discrete_distribution<> resample_index_dist(weights.begin(), weights.end());
     
     // init variables
     vector<Particle> resambled_particles;
-    double beta = 0;
-    
-    // select index by random
-    int index = uniform_int(generator);
     
     // for each particle...
     for (int i = 0; i < num_particles; i++) {
         // choose particles randomly but weighted from particle array (particle with higher weight is more likely than a particle with lower weight)
-        beta += uniform(generator);
-        while (weights[index] < beta) {
-            beta -= weights[index];
-            index = (index+1) % num_particles;
-        }
+        int index = resample_index_dist(generator);
         resambled_particles.push_back(particles[index]);
     }
     // update particles array
